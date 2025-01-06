@@ -1,7 +1,40 @@
 # n80dev
  Game Development Library for PC-8001
 
+![ゲーム画面](./assets/n80games.png "ゲーム画面")
+
+これら PC-8001/mkII 用のゲーム開発に使ったライブラリです。
+
+## 開発環境
+
+コンパイラには SDCC 4.0.0 を使っています。
+
+## ライブラリの構成
+
 + n80dev.h
+
+ゲーム側のソースコードで include するファイルです。
+
+n80dev.h 内で n80dev_config.h を include しますが、
+n80dev_config.h はゲーム側のフォルダに用意して、
+ファイル内で各種 define を定義します。
+
+n80dev_config.h の例
+```
+#ifndef _N80DEV_CONFIG_H
+#define _N80DEV_CONFIG_H
+
+#define ENABLE_ASSERT
+
+#define PUSH_KEYS (KEY_X | KEY_Z | KEY_SPACE | KEY_RET)
+
+#define LIST_HEADER_DUMMY_SIZE 8
+
+#define COUNT_VRTC_IN_LIB
+
+#endif
+```
+
 
 ### PC-8001mkII 描画
 
