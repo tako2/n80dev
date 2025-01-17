@@ -81,7 +81,7 @@ void swap_screen() __naked
 __asm
 	call	_wait_update_flag
 
-_swap_screen_exec:	// static void swap_screen_exec()
+_swap_screen_exec::	// static void swap_screen_exec()
 	xor		a, a
 	out		(0x66), a
 	ld		a, (_OFFSCR_ADDR+1)
@@ -98,6 +98,7 @@ __endasm;
 }
 
 //=============================================================================
+#ifdef COUNT_VRTC_IN_LIB
 static void swap_screen_async_68h() __naked
 {
 __asm
@@ -127,6 +128,7 @@ _swap_screen_async_skip1:
 	jp		_swap_screen_exec
 __endasm;
 }
+#endif
 
 //=============================================================================
 #ifndef RECORD_FPS
@@ -136,15 +138,14 @@ void swap_screen_async() __preserves_regs(b, c, iyh, iyl) __naked
 #endif
 {
 __asm
+#ifdef COUNT_VRTC_IN_LIB
 	ld		hl, #_swap_screen_flag
 	ld		a, (hl)
 	dec		a
 _swap_screen_async_emu:
 	jr		z, _swap_screen_async_68h
 
-#if 1
 	ex		af, af		// A' = swap_screen_flag - 1
-#endif
 
 	// count VRTC
 	in		a, (0x40)
@@ -160,24 +161,42 @@ _swap_screen_async_emu:
 	inc		hl
 	inc		(hl)		// inc (_num_vrtc)
 
-#if 0
-	dec		hl
-	dec		hl			// HL = _swap_screen_flag
-	ld		a, (hl)		// A = (_swap_screen_flag)
-	or		a, a
-	ret		z			// if (_swap_screen_flag) is 0, count VRTC only
+	ex		af, af		// A = swap_screen_flag - 1
 
-	dec		(hl)		// (_swap_screen_flag) --
-#else
-	ex		af, af
 	inc		a
 	ret		z			// if (_swap_screen_flag) is 0, count VRTC only
 
 	dec		a
 	ld		(_swap_screen_flag), a
-#endif
 
 	jp		z, _swap_screen_exec
+#else
+#ifdef USE_NONEMU
+	ld		hl, #_swap_screen_flag
+	ld		a, (hl)
+	dec		a
+	ret		nz
+
+	in		a, (0x68)
+	and		a, #0x10
+	ret		z
+
+	xor		a, a
+	ld		(hl), a
+
+	inc		hl
+	inc		hl
+
+	ld		a, (hl)		// A = num_vrtc
+	inc		hl
+	ld		(hl), a		// prev_num_vrtc = A
+	dec		hl
+	xor		a, a
+	ld		(hl), a		// num_vrtc = 0
+
+	jp		_swap_screen_exec
+#endif
+#endif
 
 	ret
 __endasm;
@@ -193,6 +212,7 @@ __asm
 	ld		(_swap_async), a
 #endif
 
+#ifdef COUNT_VRTC_IN_LIB
 	ld		a, (_num_vrtc)	// A = num_vrtc
 	sla		l				// L = wait * 2
 	jr		z, _enable_swap_screen_skip1
@@ -231,6 +251,16 @@ _enable_swap_screen_skip4:
 	ld		(_swap_screen_flag), a
 
 	ret
+#else
+_enable_swap_screen_loop:
+#ifdef USE_NONEMU
+	in		a, (0x68)
+	and		a, #0x10
+	jr		nz, _enable_swap_screen_loop
+#endif
+	ld		a, #1
+	ld		(_swap_screen_flag), a
+#endif
 __endasm;
 }
 
@@ -329,11 +359,13 @@ __asm
 	dec		(hl)
 	dec		(hl)
 
+#ifdef COUNT_VRTC_IN_LIB
 	ld		hl, #_swap_screen_async_emu+1
 	ld		(hl), #0
 
 	ld		hl, #_enable_swap_screen_for_emu+1
 	ld		(hl), #0
+#endif
 
 	ret
 __endasm;

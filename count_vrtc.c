@@ -134,6 +134,7 @@ __endasm;
 void count_vrtc() __preserves_regs(b, c, d, e, iyh, iyl) __naked
 {
 __asm
+#ifdef COUNT_VRTC_IN_LIB
 	in		a, (0x40)
 	and		a, #0x20
 
@@ -147,7 +148,7 @@ __asm
 
 	inc		hl			// _num_vrtc is placed 1 byte after
 	inc		(hl)
-
+#endif
 	ret
 	// 81(91) clk
 __endasm;
