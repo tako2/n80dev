@@ -4,6 +4,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifndef ATTRS_PER_LINE
+#define ATTRS_PER_LINE 20
+#endif
+
+#define BYTES_PER_LINE (80 + ATTRS_PER_LINE * 2)
+
 #define NO_ATTR 0x18
 
 extern uint8_t *OFFSCR_ADDR;

@@ -52,14 +52,14 @@ _draw_patlines_1:
 	ld		d, h
 	inc		de
 	dec		hl
-	ld		bc, #40-3
+	ld		bc, #(BYTES_PER_LINE * 2)-3
 	ldir
 
 	pop		hl
 	pop		af
 #else
 	ex		de, hl
-	ld		bc, #40
+	ld		bc, #(BYTES_PER_LINE * 2)
 	add		hl, bc
 	ex		de, hl
 #endif

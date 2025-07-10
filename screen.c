@@ -23,6 +23,7 @@ extern uint8_t prev_vrtc;
 uint8_t *get_offscr_addr(uint16_t xy) __z88dk_fastcall __preserves_regs(b, c, iyh, iyl) __naked
 {
     xy;
+#if (ATTRS_PER_LINE == 20)
 __asm
 	// -7654321 0-------
     // -----765 43210---
@@ -57,6 +58,60 @@ __asm
 	ret
 __endasm;
     //return ((uint8_t *)(OFFSCR_ADDR + (120 * (xy & 0xff)) + (xy >> 8)));
+#elif (ATTRS_PER_LINE == 1)
+	// total = 136clk (156clk)
+	// x82 = x64 + x16 + x2 = 2 (32 + 8 + 1)
+	ld		a, l
+	add		a, a
+	add		a, a
+	add		a, a
+	ld		e, a	// E = y * 8
+	add		a, l
+	ld		l, a	// L = y * 9
+
+	ex		de, hl
+	ld		h, #0
+	add		hl, hl
+	add		hl, hl	// HL = y * 32
+	ld		a, d	// A = x
+	ld		d, #0
+	add		hl, de	// HL = y * 41
+	add		hl, hl	// HL = y * 82
+
+	ld		e, a
+	ld		a, (_OFFSCR_ADDR+1)
+	ld		d, a
+	add		hl, de	// HL = y * 82 + x + (_OFFSCRR_ADDR)
+	ret
+#else // if (ATTRS_PER_LINE == 8)
+__asm
+	// total = 94clk (113clk)
+	ld		a, (_OFFSCR_ADDR+1)
+	ld		d, a
+
+	ld		a, l
+	add		a, a
+	add		a, l	// A = y * 3
+
+					// A = 76543210
+	rrca
+	rrca
+	rrca			// A = 21076543
+	ld		l, a
+	and		a, #0x1f
+	ld		e, a	// E = ---76543
+	xor		a, l	// A = 210-----
+	add		a, h	// A = A + x
+	ld		l, a
+	adc		a, e
+	sub		a, l
+	add		a, d
+	ld		h, a
+
+	ret
+__endasm;
+    // return ((uint8_t *)(OFFSCR_ADDR + (96 * (xy & 0xff)) + (xy >> 8)));
+#endif
 }
 
 //=============================================================================
@@ -292,6 +347,7 @@ _init_screen_vram_1:
 	inc		de
 	ld		bc, #80
 	ldir
+
 	ex		de, hl
 	ld		(hl), #NO_ATTR // 0xe8
 	inc		hl
@@ -300,7 +356,7 @@ _init_screen_vram_1:
 	ld		d, h
 	inc		de
 	dec		hl
-	ld		bc, #40-3
+	ld		bc, #(ATTRS_PER_LINE * 2 - 3)
 	ldir
 	ex		de, hl
 
@@ -476,10 +532,16 @@ __asm
 _clear_vram_0:
 	call	__fill_line
 
-	ld		de, #39
+	// skip attributes area, (clear last byte as used N of attrs)
+#if (ATTRS_PER_LINE == 20)
+	ld		de, #40-1
 	add		hl, de
 	ld		(hl), #0
 	inc		hl
+#else
+	ld		de, #(ATTRS_PER_LINE * 2)
+	add		hl, de
+#endif
 
 	dec		a
 	jr		nz, _clear_vram_0

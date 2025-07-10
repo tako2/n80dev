@@ -434,7 +434,7 @@ __asm
 	// DE = dest
 	// B = height, C = width
 	// A' = skip_src
-	ld		a, #120
+	ld		a, #BYTES_PER_LINE
 	sub		a, c		// A = skip_dest
 
 #ifndef NOT_USE_CLIPPING
@@ -501,7 +501,7 @@ __asm
 	// HL = dest
 	// B = height, C = width
 	// A' = skip_src
-	ld		a, #120
+	ld		a, #BYTES_PER_LINE
 	sub		a, c		// A = skip_dest
 
 __blit_mask_loop2:
@@ -546,7 +546,7 @@ __asm
 	// HL = dest
 	// B = height, C = width
 	// A' = skip_src
-	ld		a, #120
+	ld		a, #BYTES_PER_LINE
 	sub		a, c		// A = skip_dest
 
 __blit_or_loop2:
@@ -591,7 +591,7 @@ __asm
 	// HL = dest
 	// B = height, C = width
 	// A' = skip_src
-	ld		a, #120
+	ld		a, #BYTES_PER_LINE
 	sub		a, c		// A = skip_dest
 
 __blit_xor_loop2:
@@ -672,7 +672,7 @@ __asm
 	// B = height
 	// C = width
 
-	ld		a, #120
+	ld		a, #BYTES_PER_LINE
 	sub		a, c		// A = 120 - width
 
 _put_bitmap_vram_loop:

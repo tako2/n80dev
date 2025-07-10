@@ -22,7 +22,7 @@ __asm
 
 _draw_hlines_1:
 	call	__fill_line
-	ld		de, #40
+	ld		de, #(ATTRS_PER_LINE * 2)
 	add		hl, de
 	dec		a
 	jr		nz, _draw_hlines_1

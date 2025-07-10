@@ -137,6 +137,37 @@ _get_vram_bit_skip3:
 __endasm;
 }
 
+//=============================================================================
+void get_vram_bity() __naked
+{
+	// Input:
+	//   H = x, L = y
+	// Output:
+	//   HL : VRAM address
+	//    C : bit pattern 1 (lower 4bit)
+	//    B : bit pattern 2 (higher 4bit)
+__asm
+	xor		a, a
+	srl		l
+	adc		a, #1
+	srl		l
+	jr		nc, _get_vram_bity_skip2
+	add		a, a
+	add		a, a
+_get_vram_bity_skip2:
+	ld		c, a
+	rlca
+	rlca
+	rlca
+	rlca
+	and		a, #0xf0
+	ld		b, a
+
+	srl		h
+	jp		_get_offscr_addr
+__endasm;
+}
+
 #if 0
 uint8_t bit_x(uint8_t bit) __z88dk_fastcall __naked
 {
@@ -170,6 +201,578 @@ __endasm;
 }
 
 //=============================================================================
+void draw_hline_ym(uint8_t x0, uint8_t y0, uint8_t dx, uint8_t dy) __naked
+{
+	x0; y0; dx; dy;
+__asm
+	push	bc
+	call	_get_vram_bity
+	ld		e, c
+	ld		d, b		// E = b1, D = b2
+
+	ld		bc, #-BYTES_PER_LINE	// BC = -120
+
+	exx
+	pop		de
+	//ld		e, 4 (iy)	// E' = dx
+	ld		b, e
+	inc		b			// B' = num_x = dx + 1
+	ld		c, e
+	srl		c			// C' = d = (dx / 2)
+	//ld		d, 5 (iy)	// D' = dy
+	exx
+
+	//bit		0, 2 (iy)
+	bit		0, l
+	jr		z, _draw_hline_ym_skip1
+
+	// (x0 & 1) != 0
+	ld		a, (hl)
+	or		a, d
+	ld		(hl), a
+	inc		hl			// *vram ++ |= b2
+
+	exx
+	ld		a, c
+	sub		a, d
+	ld		c, a		// d -= dy
+	dec		b			// num_x --
+	ret		z
+	exx
+
+_draw_hline_ym_skip1:
+	exx
+_draw_hline_ym_loop1:
+	bit		7, c		// if (d < 0)
+	jr		z, _draw_hline_ym_skip2_1
+
+	// d < 0
+	ld		a, c
+	add		a, e
+	ld		c, a		// d += dx
+
+	exx
+
+	bit		0, e		// b1 == 0x01
+	jr		z, _draw_hline_ym_skip3
+
+	// b1 == 0x01
+	add		hl, bc
+	ld		de, #0x8008	// b1 = 0x08, b2 = 0x80
+	jr		_draw_hline_ym_skip2
+
+_draw_hline_ym_skip3:
+	// b1 != 0x01
+	srl		e
+	srl		d
+
+_draw_hline_ym_skip2:
+	exx
+
+_draw_hline_ym_skip2_1:
+	dec		b
+	jr		nz, _draw_hline_ym_skip4
+	exx
+	ld		d, #0	// b2 = 0
+	exx
+
+_draw_hline_ym_skip4:
+	ld		a, c
+	sub		a, d
+	ld		c, a	// d -= dy
+
+	jr		nc, _draw_hline_ym_skip5
+
+	// d < 0
+	add		a, e
+	ld		c, a	// d += dx
+
+	exx
+
+	// add_y < 0
+	bit		4, d	// b2 == 0x10
+	jr		nz, _draw_hline_ym_skip6
+
+	// b2 != 0x10
+	srl		d
+	ld		a, d
+	or		a, e
+	or		a, (hl)
+	ld		(hl), a
+	inc		hl
+	srl		e
+	jr		_draw_hline_ym_skip7
+
+_draw_hline_ym_skip6:
+	// b2 == 0x10
+	ld		d, #0x80
+	ld		a, e
+	or		a, (hl)
+	ld		(hl), a
+	add		hl, bc
+	ld		a, d
+	or		a, (hl)
+	ld		(hl), a
+	inc		hl
+	ld		e, #0x08
+	jr		_draw_hline_ym_skip7
+
+_draw_hline_ym_skip5:
+	exx
+	ld		a, d
+	or		a, e
+	or		a, (hl)
+	ld		(hl), a
+	inc		hl
+
+_draw_hline_ym_skip7:
+	ld		a, d
+	or		a, a
+	ret		z
+
+	exx
+	dec		b		// num_x --
+	ret		z
+
+	ld		a, c
+	sub		a, d
+	ld		c, a	// d -= dy
+
+	jp		_draw_hline_ym_loop1
+__endasm;
+}
+
+//=============================================================================
+void draw_hline_yp(uint8_t x0, uint8_t y0, uint8_t dx, uint8_t dy) __naked
+{
+	x0; y0; dx; dy;
+__asm
+	push	bc
+	call	_get_vram_bity
+	ld		e, c
+	ld		d, b		// E = b1, D = b2
+
+	ld		bc, #BYTES_PER_LINE		// BC = 120
+
+	exx
+	pop		de
+	//ld		e, 4 (iy)	// E' = dx
+	ld		b, e
+	inc		b			// B' = num_x = dx + 1
+	ld		c, e
+	srl		c			// C' = d = (dx / 2)
+	//ld		d, 5 (iy)	// D' = dy
+	exx
+
+	//bit		0, 2 (iy)
+	bit		0, l
+	jr		z, _draw_hline_yp_skip1
+
+	// (x0 & 1) != 0
+	ld		a, (hl)
+	or		a, d
+	ld		(hl), a
+	inc		hl			// *vram ++ |= b2
+
+	exx
+	ld		a, c
+	sub		a, d
+	ld		c, a		// d -= dy
+	dec		b			// num_x --
+	ret		z
+	exx
+
+_draw_hline_yp_skip1:
+	exx
+_draw_hline_yp_loop1:
+	bit		7, c		// if (d < 0)
+	jr		z, _draw_hline_yp_skip2_1
+
+	// d < 0
+	ld		a, c
+	add		a, e
+	ld		c, a		// d += dx
+
+	exx
+
+	// add_y > 0
+	bit		3, e		// b1 == 0x08
+	jr		z, _draw_hline_yp_skip3_2
+
+	// b1 == 0x08
+	add		hl, bc
+	ld		de, #0x1001	// b1 = 0x01, b2 = 0x10
+	jr		_draw_hline_yp_skip2
+
+_draw_hline_yp_skip3_2:
+	// b1 != 0x08
+	sla		e
+	sla		d
+
+_draw_hline_yp_skip2:
+	exx
+
+_draw_hline_yp_skip2_1:
+	dec		b
+	jr		nz, _draw_hline_yp_skip4
+	exx
+	ld		d, #0	// b2 = 0
+	exx
+
+_draw_hline_yp_skip4:
+	ld		a, c
+	sub		a, d
+	ld		c, a	// d -= dy
+
+	jr		nc, _draw_hline_yp_skip5
+
+	// d < 0
+	add		a, e
+	ld		c, a	// d += dx
+
+	exx
+
+	// add_y >= 0
+	bit		7, d	// b2 == 0x80
+	jr		nz, _draw_hline_yp_skip6_2
+
+	// b2 != 0x80
+	sla		d
+	ld		a, d
+	or		a, e
+	or		a, (hl)
+	ld		(hl), a
+	inc		hl
+	sla		e
+	jr		_draw_hline_yp_skip7
+
+_draw_hline_yp_skip6_2:
+	// b2 == 0x80
+	ld		d, #0x10
+	ld		a, e
+	or		a, (hl)
+	ld		(hl), a
+	add		hl, bc
+	ld		a, d
+	or		a, (hl)
+	ld		(hl), a
+	inc		hl
+	ld		e, #0x01
+	jr		_draw_hline_yp_skip7
+
+_draw_hline_yp_skip5:
+	exx
+	ld		a, d
+	or		a, e
+	or		a, (hl)
+	ld		(hl), a
+	inc		hl
+
+_draw_hline_yp_skip7:
+	ld		a, d
+	or		a, a
+	ret		z
+
+	exx
+	dec		b		// num_x --
+	ret		z
+
+	ld		a, c
+	sub		a, d
+	ld		c, a	// d -= dy
+
+	jp		_draw_hline_yp_loop1
+__endasm;
+}
+
+//=============================================================================
+#if 0
+void draw_hline(uint8_t x0, uint8_t y0,
+				uint8_t dx, uint8_t dy, int8_t add_y) __naked
+{
+	x0; y0; dx; dy; add_y;
+__asm
+	ld		iy, #0
+	add		iy, sp
+
+	ld		l, 3 (iy)	// L = y0
+	ld		h, 2 (iy)	// H = x0
+
+	call	_get_vram_bity
+	ld		e, c
+	ld		d, b		// E = b1, D = b2
+
+	bit		7, 6 (iy)	// if add_y is plus or minus
+	jr		nz, _draw_hline_skip0_1
+	ld		bc, #BYTES_PER_LINE		// BC = 120
+	jr		_draw_hline_skip0_2
+_draw_hline_skip0_1:
+	ld		bc, #-BYTES_PER_LINE	// BC = -120
+_draw_hline_skip0_2:
+
+	exx
+	ld		e, 4 (iy)	// E' = dx
+	ld		b, e
+	inc		b			// B' = num_x = dx + 1
+	ld		c, e
+	srl		c			// C' = d = (dx / 2)
+	ld		d, 5 (iy)	// D' = dy
+	exx
+
+	bit		0, 2 (iy)
+	jr		z, _draw_hline_skip1
+
+	// (x0 & 1) != 0
+	ld		a, (hl)
+	or		a, d
+	ld		(hl), a
+	inc		hl			// *vram ++ |= b2
+
+	exx
+	ld		a, c
+	sub		a, d
+	ld		c, a		// d -= dy
+	dec		b			// num_x --
+	ret		z
+	exx
+
+_draw_hline_skip1:
+	exx
+_draw_hline_loop1:
+	bit		7, c		// if (d < 0)
+	jr		z, _draw_hline_skip2_1
+
+	// d < 0
+	ld		a, c
+	add		a, e
+	ld		c, a		// d += dx
+
+	exx
+
+	bit		7, b		// if (add_y < 0)
+	jr		z, _draw_hline_skip3_1
+
+	bit		0, e		// b1 == 0x01
+	jr		z, _draw_hline_skip3
+
+	// b1 == 0x01
+	add		hl, bc
+	ld		de, #0x8008	// b1 = 0x08, b2 = 0x80
+	jr		_draw_hline_skip2
+
+_draw_hline_skip3:
+	srl		e
+	srl		d
+	jr		_draw_hline_skip2
+
+_draw_hline_skip3_1:
+	bit		3, e		// b1 == 0x08
+	jr		z, _draw_hline_skip3_2
+
+	// b1 == 0x08
+	add		hl, bc
+	ld		de, #0x1001	// b1 = 0x01, b2 = 0x10
+	jr		_draw_hline_skip2
+
+_draw_hline_skip3_2:
+	sla		e
+	sla		d
+
+_draw_hline_skip2:
+	exx
+
+_draw_hline_skip2_1:
+	dec		b
+	jr		nz, _draw_hline_skip4
+	exx
+	ld		d, #0	// b2 = 0
+	exx
+
+_draw_hline_skip4:
+	ld		a, c
+	sub		a, d
+	ld		c, a	// d -= dy
+
+	jr		nc, _draw_hline_skip5
+
+	// d < 0
+	add		a, e
+	ld		c, a	// d += dx
+
+	exx
+
+	bit		7, b	// if (add_y < 0)
+	jr		z, _draw_hline_skip6_1
+
+	// add_y < 0
+	bit		4, d	// b2 == 0x10
+	jr		nz, _draw_hline_skip6
+
+	// b2 != 0x10
+	srl		d
+	ld		a, d
+	or		a, e
+	or		a, (hl)
+	ld		(hl), a
+	inc		hl
+	srl		e
+	jr		_draw_hline_skip7
+
+_draw_hline_skip6:
+	ld		d, #0x80
+	ld		a, e
+	or		a, (hl)
+	ld		(hl), a
+	add		hl, bc
+	ld		a, d
+	or		a, (hl)
+	ld		(hl), a
+	inc		hl
+	ld		e, #0x08
+	jr		_draw_hline_skip7
+
+_draw_hline_skip6_1:
+	// add_y >= 0
+	bit		7, d	// b2 == 0x80
+	jr		nz, _draw_hline_skip6_2
+
+	// b2 != 0x80
+	sla		d
+	ld		a, d
+	or		a, e
+	or		a, (hl)
+	ld		(hl), a
+	inc		hl
+	sla		e
+	jr		_draw_hline_skip7
+
+_draw_hline_skip6_2:
+	ld		d, #0x10
+	ld		a, e
+	or		a, (hl)
+	ld		(hl), a
+	add		hl, bc
+	ld		a, d
+	or		a, (hl)
+	ld		(hl), a
+	inc		hl
+	ld		e, #0x01
+	jr		_draw_hline_skip7
+
+_draw_hline_skip5:
+	exx
+	ld		a, d
+	or		a, e
+	or		a, (hl)
+	ld		(hl), a
+	inc		hl
+
+_draw_hline_skip7:
+	ld		a, d
+	or		a, a
+	ret		z
+
+	exx
+	dec		b		// num_x --
+	ret		z
+
+	ld		a, c
+	sub		a, d
+	ld		c, a	// d -= dy
+
+	jp		_draw_hline_loop1
+__endasm;
+
+#if 0
+	uint8_t *vram;
+	int8_t d;
+	uint8_t num_x;
+	uint8_t b1, b2;
+
+	vram = get_offscr_addr(((x0 & 0xfe) << 7) | (y0 >> 2));
+	b1 = 1 << (y0 & 3);
+	b2 = b1 << 4;
+
+	d = (dx / 2);
+	num_x = dx + 1;
+
+	if (x0 & 1) {
+		*vram ++ |= b2;
+		d -= dy;
+		num_x --;
+	}
+
+	while (num_x != 0) {
+		if (d < 0) {
+			d += dx;
+			if (add_y < 0) {
+				if (b1 == 0x01) {
+					vram -= 120;
+					b1 = 0x08;
+					b2 = 0x80;
+				} else {
+					b1 >>= 1;
+					b2 >>= 1;
+				}
+			} else {
+				if (b1 == 0x08) {
+					vram += 120;
+					b1 = 0x01;
+					b2 = 0x10;
+				} else {
+					b1 <<= 1;
+					b2 <<= 1;
+				}
+			}
+		}
+
+		num_x --;
+		if (num_x == 0) {
+			b2 = 0;
+		}
+		d -= dy;
+
+		if (d < 0) {
+			d += dx;
+			if (add_y < 0) {
+				if (b2 != 0x10) {
+					b2 >>= 1;
+					*vram ++ |= (b1 | b2);
+					b1 >>= 1;
+				} else {
+					b2 = 0x80;
+					*vram |= b1;
+					vram -= 120;
+					*vram ++ |= b2;
+					b1 = 0x08;
+				}
+			} else {
+				if (b2 != 0x80) {
+					b2 <<= 1;
+					*vram ++ |= (b1 | b2);
+					b1 <<= 1;
+				} else {
+					b2 = 0x10;
+					*vram |= b1;
+					vram += 120;
+					*vram ++ |= b2;
+					b1 = 0x01;
+				}
+			}
+		} else {
+			*vram ++ |= (b1 | b2);
+		}
+		if (b2 == 0) return;
+
+		d -= dy;
+		num_x --;
+	}
+#endif
+}
+#endif
+
+//=============================================================================
+#if 0
 void draw_hline(uint8_t x0, uint8_t y0,
 				uint8_t dx, uint8_t dy, int8_t add_y)
 {
@@ -224,14 +827,16 @@ __asm
 	ld		iy, #0
 	add		iy, sp
 
-	ld		l, 3 (iy)
-	ld		h, 2 (iy)
+	ld		l, 3 (iy)	// L = y0
+	ld		h, 2 (iy)	// H = x0
 
 	call	_get_vram_bit
 
-	ld		b, 4 (iy)
+	// HL = vram addr, C = bit pat
+
+	ld		b, 4 (iy)	// B = dx
 	inc		b
-	ld		de, #120
+	ld		de, #BYTES_PER_LINE
 
 	exx
 	ld		l, 4 (iy)	// L = dx
@@ -307,6 +912,7 @@ _draw_hline_skip4:
 __endasm;
 #endif
 }
+#endif
 
 //=============================================================================
 void next_bity() __naked
@@ -326,6 +932,422 @@ _next_bity_skip:
 __endasm;
 }
 
+//=============================================================================
+void draw_vline_xm(uint8_t x0, uint8_t y0, uint8_t dx, uint8_t dy) __naked
+{
+	x0; y0; dx; dy;
+__asm
+	ld		iy, #0
+	add		iy, sp
+
+	ld		l, 3 (iy)	// L = Y0
+	ld		h, 2 (iy)	// H = X0
+
+	call	_get_vram_bit
+						// HL = vram, C = bit
+
+	ld		b, 5 (iy)	// B = dy (num_y)
+	ld		a, b
+	srl		a			// A' = dy / 2 (d)
+	ex		af, af
+	inc		b
+
+	ld		d, 4 (iy)	// D = dx
+
+	ld		e, c		// E = C (dest = bit)
+
+	dec		b
+	jr		z, _draw_vline_xm_ret
+
+_draw_vline_xm_loop1:
+	ld		a, c
+	rlca
+	ld		c, a
+	and		a, #0x11
+	jr		z, _draw_vline_xm_skip1
+
+	// bit(C) is looped
+	xor		a, #0x11
+	ld		c, a
+
+	ld		a, e
+	or		a, (hl)
+	ld		(hl), a
+	ld		e, #0
+
+	// HL += BYTES_PER_LINE
+	ld		a, #BYTES_PER_LINE
+	add		a, l
+	ld		l, a
+	adc		a, h
+	sub		a, l
+	ld		h, a
+
+_draw_vline_xm_skip1:
+	ex		af, af		// * A'
+	sub		a, d
+	jr		nc, _draw_vline_xm_skip3
+
+	// (d < 0)
+	add		a, 5 (iy)	// A' += dy
+	ex		af, af		// * A
+
+	// (add_x < 0)
+	ld		a, #0x0f
+	and		a, c
+	jr		z, _draw_vline_xm_skip5
+
+	// (bit & 0x0f) != 0
+	ld		a, e
+	or		a, (hl)
+	ld		(hl), a
+	ld		e, #0
+	dec		hl
+
+	// bit(C) <<= 4
+	ld		a, c
+	rlca
+	rlca
+	rlca
+	rlca
+	ld		c, a
+
+	jr		_draw_vline_xm_skip7
+
+_draw_vline_xm_skip5:
+	// bit(C) >>= 4
+	ld		a, c
+	rrca
+	rrca
+	rrca
+	rrca
+	ld		c, a
+
+	ex		af, af		// * A'
+
+_draw_vline_xm_skip3:
+	ex		af, af		// * A
+
+_draw_vline_xm_skip7:
+	// (d >= 0)
+	ld		a, e
+	or		a, c
+	ld		e, a
+
+	djnz	_draw_vline_xm_loop1
+
+_draw_vline_xm_ret:
+	ld		a, e
+	or		a, a
+	ret		z
+	or		a, (hl)
+	ld		(hl), a
+	ret
+__endasm;
+}
+
+//=============================================================================
+void draw_vline_xp(uint8_t x0, uint8_t y0, uint8_t dx, uint8_t dy) __naked
+{
+	x0; y0; dx; dy;
+__asm
+	ld		iy, #0
+	add		iy, sp
+
+	ld		l, 3 (iy)	// L = Y0
+	ld		h, 2 (iy)	// H = X0
+
+	call	_get_vram_bit
+						// HL = vram, C = bit
+
+	ld		b, 5 (iy)	// B = dy (num_y)
+	ld		a, b
+	srl		a			// A' = dy / 2 (d)
+	ex		af, af
+	inc		b
+
+	ld		d, 4 (iy)	// D = dx
+
+	ld		e, c		// E = C (dest = bit)
+
+	dec		b
+	jr		z, _draw_vline_xp_ret
+
+_draw_vline_xp_loop1:
+	ld		a, c
+	rlca
+	ld		c, a
+	and		a, #0x11
+	jr		z, _draw_vline_xp_skip1
+
+	// bit(C) is looped
+	xor		a, #0x11
+	ld		c, a
+
+	ld		a, e
+	or		a, (hl)
+	ld		(hl), a
+	ld		e, #0
+
+	// HL += BYTES_PER_LINE
+	ld		a, #BYTES_PER_LINE
+	add		a, l
+	ld		l, a
+	adc		a, h
+	sub		a, l
+	ld		h, a
+
+_draw_vline_xp_skip1:
+	ex		af, af		// * A'
+	sub		a, d
+	jr		nc, _draw_vline_xp_skip3
+
+	// (d < 0)
+	add		a, 5 (iy)	// A' += dy
+	ex		af, af		// * A
+
+	// (add_x >= 0)
+	ld		a, #0xf0
+	and		a, c
+	jr		z, _draw_vline_xp_skip6
+
+	// (bit & 0xf0) != 0
+	ld		a, e
+	or		a, (hl)
+	ld		(hl), a
+	ld		e, #0
+	inc		hl
+
+	// bit(C) >>= 4
+	ld		a, c
+	rrca
+	rrca
+	rrca
+	rrca
+	ld		c, a
+
+	jr		_draw_vline_xp_skip7
+
+_draw_vline_xp_skip6:
+	// bit(C) <<= 4
+	ld		a, c
+	rlca
+	rlca
+	rlca
+	rlca
+	ld		c, a
+
+	ex		af, af		// * A'
+
+_draw_vline_xp_skip3:
+	ex		af, af		// * A
+
+_draw_vline_xp_skip7:
+	// (d >= 0)
+	ld		a, e
+	or		a, c
+	ld		e, a
+
+	djnz	_draw_vline_xp_loop1
+
+_draw_vline_xp_ret:
+	ld		a, e
+	or		a, a
+	ret		z
+	or		a, (hl)
+	ld		(hl), a
+	ret
+__endasm;
+}
+
+#if 0
+//=============================================================================
+void draw_vline(uint8_t x0, uint8_t y0, uint8_t dx, uint8_t dy, int8_t add_x) __naked
+{
+	x0; y0; dx; dy; add_x;
+__asm
+	ld		iy, #0
+	add		iy, sp
+
+	ld		l, 3 (iy)	// L = Y0
+	ld		h, 2 (iy)	// H = X0
+
+	call	_get_vram_bit
+						// HL = vram, C = bit
+
+	ld		b, 5 (iy)	// B = dy (num_y)
+	ld		a, b
+	srl		a			// A' = dy / 2 (d)
+	ex		af, af
+	inc		b
+
+	ld		d, 4 (iy)	// D = dx
+
+	ld		e, c		// E = C (dest = bit)
+
+	dec		b
+	jr		z, _draw_vline_ret
+
+_draw_vline_loop1:
+	ld		a, c
+	rlca
+	ld		c, a
+	and		a, #0x11
+	jr		z, _draw_vline_skip1
+
+	// bit(C) is looped
+	xor		a, #0x11
+	ld		c, a
+
+	ld		a, e
+	or		a, (hl)
+	ld		(hl), a
+	ld		e, #0
+
+	// HL += BYTES_PER_LINE
+	ld		a, #BYTES_PER_LINE
+	add		a, l
+	ld		l, a
+	adc		a, h
+	sub		a, l
+	ld		h, a
+
+_draw_vline_skip1:
+	ex		af, af		// * A'
+	sub		a, d
+	jr		nc, _draw_vline_skip3
+
+	// (d < 0)
+	add		a, 5 (iy)	// A' += dy
+	ex		af, af		// * A
+
+	bit		7, 6 (iy)	// add_x
+	jr		z, _draw_vline_skip4
+
+	// (add_x < 0)
+	ld		a, #0x0f
+	and		a, c
+	jr		z, _draw_vline_skip5
+
+	ld		a, e
+	or		a, (hl)
+	ld		(hl), a
+	ld		e, #0
+	dec		hl
+
+_draw_vline_skip6:
+	// bit(C) <<= 4
+	ld		a, c
+	rlca
+	rlca
+	rlca
+	rlca
+	ld		c, a
+
+	jr		_draw_vline_skip7
+
+_draw_vline_skip4:
+	// (add_x >= 0)
+	ld		a, #0xf0
+	and		a, c
+	jr		z, _draw_vline_skip6
+
+	ld		a, e
+	or		a, (hl)
+	ld		(hl), a
+	ld		e, #0
+	inc		hl
+
+_draw_vline_skip5:
+	// bit(C) >>= 4
+	ld		a, c
+	rrca
+	rrca
+	rrca
+	rrca
+	ld		c, a
+
+	ex		af, af		// * A'
+
+_draw_vline_skip3:
+	ex		af, af		// * A
+
+_draw_vline_skip7:
+	// (d >= 0)
+	ld		a, e
+	or		a, c
+	ld		e, a
+
+	djnz	_draw_vline_loop1
+
+_draw_vline_ret:
+	ld		a, e
+	or		a, a
+	ret		z
+	or		a, (hl)
+	ld		(hl), a
+	ret
+__endasm;
+
+#if 0
+	uint8_t *vram;
+	uint8_t bit;
+	int8_t d;
+	uint8_t num_y;
+	uint8_t dest;
+
+	vram = get_offscr_addr(((x0 & 0xfe) << 7) | (y0 >> 2));
+	bit = 1 << (y0 & 3);
+	if (x0 & 1) bit <<= 4;
+
+	d = dy / 2;
+	num_y = dy;
+
+	dest = bit;
+	while (num_y != 0) {
+		if (bit & 0x88) {
+			*vram |= dest;
+			dest = 0;
+			vram += BYTES_PER_LINE;
+			bit >>= 3;
+		} else {
+			bit <<= 1;
+		}
+
+		d -= dx;
+		if (d < 0) {
+			d += dy;
+			if (add_x < 0) {
+				if (bit & 0x0f) {
+					*vram |= dest;
+					dest = 0;
+					vram --;
+					bit <<= 4;
+				} else {
+					bit >>= 4;
+				}
+			} else {
+				if (bit & 0xf0) {
+					*vram |= dest;
+					dest = 0;
+					vram ++;
+					bit >>= 4;
+				} else {
+					bit <<= 4;
+				}
+			}
+			dest |= bit;
+		} else {
+			dest |= bit;
+		}
+		num_y --;
+	}
+	if (dest != 0) *vram |= dest;
+#endif
+}
+#endif
+
+#if 0
 //=============================================================================
 void draw_vline(uint8_t x0, uint8_t y0, uint8_t dx, uint8_t dy, int8_t add_x)
 {
@@ -394,7 +1416,7 @@ __asm
 
 	ld		b, 5 (iy)
 	inc		b
-	ld		de, #120
+	ld		de, #BYTES_PER_LINE
 
 	exx
 	ld		l, 4 (iy)	// L = dx
@@ -471,6 +1493,7 @@ _draw_vline_main1:
 	jr		_draw_vline_loop
 __endasm;
 }
+#endif
 
 //=============================================================================
 void draw_fast_hline(uint8_t x, uint8_t y, uint8_t num_x) __naked
@@ -483,6 +1506,52 @@ __asm
 	ld		l, 3 (iy)
 	ld		h, 2 (iy)
 
+	call	_get_vram_bity
+
+	ld		d, 4 (iy)
+	inc		d
+
+	bit		0, 2 (iy)
+	jr		z, _draw_fast_hline_skip1
+
+	ld		a, b
+	or		a, (hl)
+	ld		(hl), a
+	inc		hl
+	dec		d
+
+_draw_fast_hline_loop1:
+#ifdef COUNT_VRTC_IN_LIB
+	jp		z, _count_vrtc
+#else
+	ret		z
+#endif
+
+_draw_fast_hline_skip1:
+	dec		d
+	jr		z, _draw_fast_hline_skip2
+
+	ld		a, b 
+	or		a, c
+	or		a, (hl)
+	ld		(hl), a
+	inc		hl
+
+	dec		d
+	jr		_draw_fast_hline_loop1
+
+_draw_fast_hline_skip2:
+	ld		a, c
+	or		a, (hl)
+	ld		(hl), a
+
+#ifdef COUNT_VRTC_IN_LIB
+	jp		_count_vrtc
+#else
+	ret
+#endif
+
+#if 0
 	call	_get_vram_bit
 
 	ld		b, 4 (iy)
@@ -496,7 +1565,13 @@ _draw_fast_hline_loop:
 	call	_next_bitx
 
 	djnz	_draw_fast_hline_loop
+
+#ifdef COUNT_VRTC_IN_LIB
+	jp		_count_vrtc
+#else
 	ret
+#endif
+#endif
 __endasm;
 }
 
@@ -513,7 +1588,7 @@ __asm
 
 	call	_get_vram_bit
 
-	ld		de, #120
+	ld		de, #BYTES_PER_LINE
 
 	ld		b, 4 (iy)
 	inc		b
@@ -526,7 +1601,12 @@ _draw_fast_vline_loop:
 	call	_next_bity
 
 	djnz	_draw_fast_vline_loop
+
+#ifdef COUNT_VRTC_IN_LIB
+	jp		_count_vrtc
+#else
 	ret
+#endif
 __endasm;
 }
 
@@ -720,7 +1800,7 @@ _draw_line_skip4:
 
 	// case (dy < dx)
 	// use draw_hline
-	ld		a, d
+	ld		a, d		// A = add_y
 	bit		7, e
 	jr		z, _draw_line_hline2
 	// case (add_x < 0)
@@ -735,6 +1815,7 @@ _draw_line_hline2:
 	ld		h, 3 (iy)
 
 _draw_line_hline3:
+#if 0
 	push	af
 	inc		sp
 	push	bc
@@ -743,7 +1824,26 @@ _draw_line_hline3:
 	pop		af
 	pop		af
 	inc		sp
+
+#ifdef COUNT_VRTC_IN_LIB
+	jp		_count_vrtc
+#else
 	ret
+#endif
+
+#else
+#ifdef COUNT_VRTC_IN_LIB
+	ld		de, #_count_vrtc
+	push	de
+#endif
+
+	ex		de, hl
+	ld		l, d
+	ld		h, e
+	bit		7, a
+	jp		nz, _draw_hline_ym
+	jp		_draw_hline_yp
+#endif
 
 _draw_line_vline2:
 	// use draw_vline
@@ -762,15 +1862,27 @@ _draw_line_vline3:
 	ld		h, 3 (iy)
 
 _draw_line_vline4:
-	push	af
-	inc		sp
+	//push	af
+	//inc		sp
 	push	bc
 	push	hl
-	call	_draw_vline
+	bit		7, a
+	jr		z, _draw_line_vline4_1
+	call	_draw_vline_xm
+	jr		_draw_line_vline4_2
+_draw_line_vline4_1:
+	call	_draw_vline_xp
+_draw_line_vline4_2:
+	//call	_draw_vline
 	pop		af
 	pop		af
-	inc		sp
+	//inc		sp
+
+#ifdef COUNT_VRTC_IN_LIB
+	jp		_count_vrtc
+#else
 	ret
+#endif
 __endasm;
 
 #if 0

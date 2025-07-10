@@ -1,5 +1,11 @@
 #include "n80dev.h"
 
+#ifndef USE_LAST_ATTR
+#if (ATTRS_PER_LINE == 20)
+#define USE_LAST_ATTR
+#endif
+#endif
+
 //=============================================================================
 void render_attr(
 #ifdef BMP_USE_RENDER_ATTR_PARAM
@@ -12,27 +18,15 @@ void render_attr(
 #endif
 
 __asm
-#if 0
-	ld		hl, (_OFFSCR_ADDR)
-	ld		l, #81
-	ld		de, #120
-	ld		b, #25
-__loop:
-	ld		(hl), #0xf8
-	add		hl, de
-	djnz	__loop
-	ret
-#endif
-
 #ifdef CLEAR_ATTR_FIRST
 	call	_clear_vram_attr
 #endif
 
 #ifndef BMP_USE_RENDER_ATTR_PARAM
-#if 0
-	ld		e, #80
+#ifdef USE_LAST_ATTR
+	ld		e, #80+(ATTRS_PER_LINE * 2)-1 //39
 #else
-	ld		e, #80+39
+	ld		e, #80
 #endif
 	ld		a, (_OFFSCR_ADDR+1)
 	ld		d, a
@@ -48,8 +42,11 @@ __loop:
 	ld		a, (hl)		// L = y
 	push	af
 	ld		l, a
-	//ld		h, #0x50
-	ld		h, #80+39
+#ifdef USE_LAST_ATTR
+	ld		h, #80+(ATTRS_PER_LINE * 2)-1 //39
+#else
+	ld		h, #80
+#endif
 	call	_get_offscr_addr
 	ex		de, hl
 	pop		af
@@ -73,14 +70,19 @@ _small_beep_inst::
 _render_attr_loop:
 	push	bc
 	push	hl		// *2 list_top
+
 #ifndef CLEAR_ATTR_FIRST
+#ifdef USE_LAST_ATTR
 	push	de		// *1 attr
 
-	ld		bc, #-39
+	ld		bc, #-((ATTRS_PER_LINE * 2)-1)	//39
 	ex		de, hl
 	add		hl, bc
 	ex		de, hl
-	ld		bc, #38
+	ld		bc, #(ATTRS_PER_LINE * 2)-2		//38
+#else
+	ld		bc, #(ATTRS_PER_LINE * 2)
+#endif
 	ldi
 	ldi
 
@@ -91,7 +93,9 @@ _render_attr_loop:
 	or		a, h	// 4
 	jr		z, _render_attr_fill_skip0
 #else
+#ifdef USE_LAST_ATTR
 	push	de		// *1 attr
+#endif
 	ld		bc, #(NUM_LIMITED_ATTR*2)
 #endif
 
@@ -109,6 +113,7 @@ _render_attr_line_loop:
 
 _render_attr_fill_skip0:
 #ifndef CLEAR_ATTR_FIRST
+#ifdef USE_LAST_ATTR
 	pop		hl		// *1 attr+39
 	ld		a, (hl)
 	ld		(hl), c
@@ -131,26 +136,30 @@ _render_attr_fill_skip0:
 	sbc		hl, bc
 	ld		bc, #0xe850
 	jp		(hl)
+#else
+	ld		a, c
+	or		a, a
+	jr		z, _render_attr_fill_skip
 
+	ex		de, hl
+	add		hl, bc
+
+	ld		iy, #0
+	add		iy, sp
+	di
+
+	ld		sp ,hl
+	ex		de, hl
+	ld		hl, #_render_attr_fill_push
+	srl		c
+	sbc		hl, bc
+	ld		bc, #0xe850
+	jp		(hl)
+#endif
+
+	.rept	19
 	push	bc
-	push	bc
-	push	bc
-	push	bc
-	push	bc
-	push	bc
-	push	bc
-	push	bc
-	push	bc
-	push	bc
-	push	bc
-	push	bc
-	push	bc
-	push	bc
-	push	bc
-	push	bc
-	push	bc
-	push	bc
-	push	bc
+	.endm
 _render_attr_fill_push:
 
 	ld		sp, iy
@@ -159,11 +168,17 @@ _render_attr_fill_skip:
 #endif
 
 #ifndef CLEAR_ATTR_FIRST
-	ld		hl, #120
+#ifdef USE_LAST_ATTR
+	ld		hl, #BYTES_PER_LINE
+#else
+	ld		hl, #80
+#endif
 	add		hl, de
 #else
+#ifdef USE_LAST_ATTR
 	pop		hl		// *1 attr
-	ld		de, #120
+#endif
+	ld		de, #BYTES_PER_LINE
 	add		hl, de
 #endif
 	pop		de		// *2 list_top

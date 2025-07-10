@@ -1,5 +1,11 @@
 #include "n80dev.h"
 
+#ifndef USE_LAST_ATTR
+#if (ATTRS_PER_LINE == 20)
+#define USE_LAST_ATTR
+#endif
+#endif
+
 //=============================================================================
 void render_attr(
 #ifdef BMP_USE_RENDER_ATTR_PARAM
@@ -30,7 +36,7 @@ __asm
 
 	ld		h, #80
 	call	_get_offscr_addr
-	ex		de, hl		// DE = attr+39
+	ex		de, hl		// DE = attr top
 
 	ld		a, c
 	add		a, a
@@ -59,7 +65,11 @@ _small_beep_inst::
 _render_attr_line_loop:
 	ex		af, af
 	push	hl
-	ld		bc, #38
+#ifdef USE_LAST_ATTR
+	ld		bc, #(ATTRS_PER_LINE * 2 - 2)
+#else
+	ld		bc, #(ATTRS_PER_LINE * 2)
+#endif
 _render_attr_loop:
 	ldi
 	ldi
@@ -76,11 +86,13 @@ _render_attr_loop:
 _render_attr_skip:
 	// BC = remain
 	ex		de, hl
-	add		hl, bc		// HL = attr + 38
+	add		hl, bc		// HL = DE + BC (last attr)
+
+#ifdef USE_LAST_ATTR
 	inc		hl
 	ld		a, (hl)
 	ld		e, a
-	ld		(hl), c
+	ld		(hl), c		// renew unused attrs
 
 	sub		a, c
 	jr		nc, _render_attr_skip2	// if (prev_remain >= remain)
@@ -89,6 +101,13 @@ _render_attr_skip:
 	ld		e, l
 	ld		d, h
 	sbc		hl, bc		// HL = attr + 39 - prev_remain - CY
+#else
+	xor		a, a
+	sub		a, c
+	ld		e, l
+	ld		d, h		// DE = next line
+	jr		z, _render_attr_skip2
+#endif
 	ld		sp, hl
 
 	ld		hl, #_render_attr_fill_push
@@ -104,11 +123,19 @@ _render_attr_skip:
 	.endm
 _render_attr_fill_push:
 	ld		sp, iy
+
+#ifdef USE_LAST_ATTR
 	ex		de, hl
 _render_attr_skip2:
 	ld		de, #80+1
 	add		hl, de
+#else
+_render_attr_skip2:
+	ld		hl, #80
+	add		hl, de
+#endif
 	ex		de, hl
+
 	pop		hl
 	inc		hl
 	inc		hl

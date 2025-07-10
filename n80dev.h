@@ -59,5 +59,7 @@ extern void count_vrtc() __preserves_regs(b, c, d, e, iyh, iyl);
 extern uint8_t num_vrtc;
 extern uint8_t prev_num_vrtc;
 
+extern void play_wav(const uint8_t *data, uint16_t size);
+
 #endif // !_N80DEV_H
 

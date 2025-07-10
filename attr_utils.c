@@ -10,11 +10,11 @@ __asm
 	ld		ix, #0
 	add		ix, sp
 
-	ld		l, 4 (ix)
+	ld		l, 4 (ix)		// L = start_line
 	ld		h, #80
     call    _get_offscr_addr
 
-	ld		a, 6 (ix)
+	ld		a, 6 (ix)		// A = color
 _fill_hlines_attr_1:
 	ld		(hl), #0
 	inc		hl
@@ -26,10 +26,10 @@ _fill_hlines_attr_1:
 	ld		e, l
 	ld		d, h
 	inc		de
-	dec		hl
-	ld		bc, #40-4
-#if 0
-	ldir	// 751
+	dec		hl			// HL = (attr top) + 2, DE = (attr top) + 4
+	ld		bc, #(ATTRS_PER_LINE * 2)-4
+#if (ATTRS_PER_LINE != 20)
+	ldir
 #else
 	ldi
 	ldi
@@ -50,7 +50,7 @@ _fill_hlines_attr_ldi:
 	ld		hl, #80
 	add		hl, de
 
-	dec		5 (ix)
+	dec		5 (ix)			// num_lines --
 	jr		nz, _fill_hlines_attr_1
 
 	pop		ix

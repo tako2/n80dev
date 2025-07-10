@@ -1070,7 +1070,7 @@ _import_attr_next:
 	ld		bc, #4
 	add		hl, bc
 	ex		de, hl
-	ld		bc, #120
+	ld		bc, #BYTES_PER_LINE
 	add		hl, bc
 	ex		de, hl
 	pop		bc

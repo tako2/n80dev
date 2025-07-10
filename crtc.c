@@ -53,6 +53,9 @@
 
 #define CRTC_ATSC	 0b010	// 000=Monochro, 001=No Attributes, 010=Color
 
+#define DMA2_ADDR	0xf300
+#define DMA2_LEN	((CRTC_WIDTH + ATTRS_PER_LINE * 2) * CRTC_HEIGHT - 1)
+
 uint8_t sys_port30h;
 
 //=============================================================================
@@ -89,15 +92,15 @@ __asm
 	out		(0x68), a
 
 	// Ch.2 DMA Address
-	ld		a, #0x00		// VRAM TOP 0xF300
+	ld		a, #DMA2_ADDR & 0xff		// VRAM TOP 0xF300
 	out		(0x64), a
-	ld		a, #0xf3
+	ld		a, #DMA2_ADDR >> 8
 	out		(0x64), a
 
 	// Ch.2 Terminal Count (DMA mode=read)
-	ld		a, #0xb7 		// (120 * CRTC_HEIGHT - 1) & 0xFF
+	ld		a, #DMA2_LEN & 0xff 	// (120 * CRTC_HEIGHT - 1) & 0xFF
 	out		(0x65), a
-	ld		a, #0x8b 		// 0x80 + ((120 * CRTC_HEIGHT - 1) >> 8)
+	ld		a, #0x80 | (DMA2_LEN >> 8)	// 0x80 + ((120 * CRTC_HEIGHT - 1) >> 8)
 	out		(0x65), a
 
 	// CRTC: Screen Format 1
@@ -117,7 +120,7 @@ __asm
 	out		(0x50), a
 
 	// CRTC: Screen Format 5 (ATTR=20)
-	ld		a, #(CRTC_ATSC << 5) + (20 - 1)
+	ld		a, #(CRTC_ATSC << 5) + (ATTRS_PER_LINE - 1)
 	out		(0x50), a
 
 	// CRTC: Set Interrupt Mask

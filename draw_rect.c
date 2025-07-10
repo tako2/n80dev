@@ -75,7 +75,7 @@ _fill_rect_2:
 	ld		b, #0
 	ldir
 	pop		hl
-	ld		c, #120
+	ld		c, #BYTES_PER_LINE
 	add		hl, bc
 	pop		bc
 
@@ -93,7 +93,7 @@ _fill_rect_1:
 	jr		z, _fill_rect_ret
 	ld		b, #0
 
-	ld		de, #120
+	ld		de, #BYTES_PER_LINE
 	ex		de, hl
 	add		hl, de
 	ex		de, hl
@@ -122,7 +122,7 @@ __asm
 	ld		c, 6 (ix) // w
 	call	_clip_hline
 
-	ld		a, #120
+	ld		a, #BYTES_PER_LINE
 	sub		a, c // _skip_dest
 	ld		e, a
 	ld		d, #0

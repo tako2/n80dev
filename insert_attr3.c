@@ -996,7 +996,7 @@ _small_beep_inst::
 
 	ld		a, #25
 	ld		bc, #0xe850
-	ld		de, #-120
+	ld		de, #-BYTES_PER_LINE
 	di
 
 _clear_vram_attr_loop:
@@ -1077,7 +1077,7 @@ _clear_vram_attr_loop:
 	nop
 _clear_vram_attr_push:
 
-	ld		hl, #120-2
+	ld		hl, #BYTES_PER_LINE-2
 	add		hl, sp
 
 	djnz	_clear_vram_attr_loop	
@@ -1251,7 +1251,7 @@ _import_attr_next:
 	ld		bc, #4
 	add		hl, bc
 	ex		de, hl
-	ld		bc, #120
+	ld		bc, #BYTES_PER_LINE
 	add		hl, bc
 	ex		de, hl
 	pop		bc

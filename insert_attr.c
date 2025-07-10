@@ -13,7 +13,7 @@ __asm
 	add		iy, sp
 
 	ld		l, 2 (iy)
-	ld		h, #119
+	ld		h, #(BYTES_PER_LINE - 1)	//119
 	call	_get_offscr_addr
 
 	ld		a, 3 (iy)
@@ -164,7 +164,7 @@ __asm
 
 	ld		c, #0
 	ld		d, #0
-	ld		b, #19
+	ld		b, #ATTRS_PER_LINE-1	//19
 _check_attr_1:
 	ld		a, (hl)
 	inc		hl
@@ -211,7 +211,7 @@ __asm
 
 	ld		a, 5 (ix) // A = x as L_POS
 	inc		hl
-	ld		b, #19    // B as L_IDX
+	ld		b, #ATTRS_PER_LINE-1	//19    // B as L_IDX
 	ld		d, #0     // D as FLAG
 _insert_attr_1:
 	ld		c, (hl)   // C = ptr->pos
@@ -248,7 +248,7 @@ _insert_attr_2:
 
 _insert_attr_3:
 	// L_POS == ptr->pos
-	ld		a, #19
+	ld		a, #ATTRS_PER_LINE-1	//19
 	cp		b
 	jr		z, _insert_attr_4
 
@@ -440,15 +440,16 @@ __endasm;
 }
 
 //=============================================================================
+#define VRAM_SIZE (BYTES_PER_LINE * 25)
 void clear_attr(uint8_t attr) __z88dk_fastcall __naked
 {
 	attr;
 __asm
 	ld		a, (_OFFSCR_ADDR+1)
-	add		a, #0xb
+	add		a, #(VRAM_SIZE >> 8)	// #0xb
 	ld		h, a
 	ld		b, l
-	ld		l, #0xb8	// OFFSCR_ADDR + 120 * 25
+	ld		l, #(VRAM_SIZE & 0xff)	// #0xb8	// OFFSCR_ADDR + 120 * 25
 	ld		c, #0		// BC = attr | 0x00
 	ld		de, #0xe850
 
@@ -460,13 +461,13 @@ __asm
 	di
 _clear_attr_loop:
 	ld		sp, hl
-	.rept	19
+	.rept	(ATTRS_PER_LINE-1)	// 19
 	push	de
 	.endm
 	push	bc
 	ex		af, af
 	ld		a, l
-	sub		a, #120
+	sub		a, #BYTES_PER_LINE
 	ld		l, a
 	sbc		a, a
 	add		a, h
